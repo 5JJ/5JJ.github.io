@@ -43,9 +43,15 @@ const YearPicker = (props: YearPickerProps) => {
     }
   }, [years, selectedYear]);
 
-  function handleStart(event: TouchEvent) {
+  function isTouchEvent(event: TouchEvent | MouseEvent): event is TouchEvent {
+    return "targetTouches" in event;
+  }
+
+  function handleStart(event: TouchEvent | MouseEvent) {
     const picker = yearPicker.current;
-    picker.touchY = event.targetTouches[0].pageY;
+    picker.touchY = isTouchEvent(event)
+      ? event.targetTouches[0].pageY
+      : event.pageY;
     picker.translateY = viewStyle.translateY;
   }
 
@@ -56,9 +62,11 @@ const YearPicker = (props: YearPickerProps) => {
       : picker.currentIndex * DATE_HEIGHT - DATE_HEIGHT / 2 > -translateY;
   }
 
-  function handleMove(event: TouchEvent) {
+  function handleMove(event: TouchEvent | MouseEvent) {
     const picker = yearPicker.current;
-    const touchY = event.targetTouches[0].pageY;
+    const touchY = isTouchEvent(event)
+      ? event.targetTouches[0].pageY
+      : event.pageY;
 
     const dir = touchY - picker.touchY;
     const translateY = picker.translateY + dir;
@@ -125,7 +133,7 @@ const YearPicker = (props: YearPickerProps) => {
     }, 200);
   }
 
-  function handleEnd(event: TouchEvent) {
+  function handleEnd(event: TouchEvent | MouseEvent) {
     const picker = yearPicker.current;
     fixListRange(picker.currentIndex);
   }
@@ -142,6 +150,7 @@ const YearPicker = (props: YearPickerProps) => {
         handleEnd(e);
       }
     };
+
     if (container) {
       container.addEventListener("touchmove", handleTouchEvent);
       container.addEventListener("touchend", handleTouchEvent);
@@ -162,12 +171,33 @@ const YearPicker = (props: YearPickerProps) => {
       if (picker.animating) return;
       handleStart(e);
     };
+    const handleMouseUpEvent = (e: MouseEvent) => {
+      const picker = yearPicker.current;
+      if (picker.animating) return;
+
+      handleEnd(e);
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", handleMouseUpEvent);
+    };
+
+    const handleMouseDownEvent = (e: MouseEvent) => {
+      e.preventDefault();
+      const picker = yearPicker.current;
+      if (picker.animating) return;
+
+      handleStart(e);
+      document.addEventListener("mousemove", handleMove);
+      document.addEventListener("mouseup", handleMouseUpEvent);
+    };
+
     if (container) {
+      container.addEventListener("mousedown", handleMouseDownEvent);
       container.addEventListener("touchstart", handleTouchEvent);
     }
     return () => {
       if (container) {
         container.removeEventListener("touchstart", handleTouchEvent);
+        container.removeEventListener("mousedown", handleMouseDownEvent);
       }
     };
   }, [viewStyle.translateY]);
